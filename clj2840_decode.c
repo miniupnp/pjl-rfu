@@ -16,6 +16,7 @@
 
 static unsigned char elfmagic[4] = {'\x7f', 'E', 'L', 'F'};
 static unsigned char jpgmagic[3] = {'\xFF', '\xD8', '\xFF'};
+static char lzmamagic[3] = { '\x5d', '\x00', '\x00' };
 
 ssize_t search(const void * data, size_t len,
                const void * subj, int subj_len,
@@ -60,36 +61,26 @@ void clj2840_decode(const void * data, size_t len)
 	size_t ofs;
 	const unsigned char * p;
 	ssize_t elf_ofs = 0;
-	size_t end;
 	ssize_t ofs1, ofs2;
 	p = (const unsigned char*)data;
 
 	if((elf_ofs = search(data, len, elfmagic, 4, 4, 0)) >= 0) {
 		printf("ELF found at %08lx\n", elf_ofs);
 		savefile(data + elf_ofs, len - elf_ofs, "output.elf");
-		end = elf_ofs;
-	} else {
-		end = len;
 	}
 
 	i = 0;
-	while(ofs < end) {
+	while(ofs < len - 32) {
 		uint32_t a, b, c, d;
 		uint32_t header_len, chunk_len;
+		const char * ext;
 		a = READU32((p + ofs));
 		b = READU32((p + ofs + 4));
 		c = READU32((p + ofs + 8));
 		d = READU32((p + ofs + 12));
 		printf("%06lx:   %08x   %08x   %08x   %08x", ofs, a, b, c, d);
-		printf("\t%06lx left\n", end - ofs);
+		printf("\t%06lx left\n", len - ofs);
 		printf("        %10u %10u %10u %10u\n", a, b, c, d);
-#if 0
-		for(i = 0; i< 3; i++, ofs+=4) {
-			u = READU32((p + ofs));
-			printf("%06lx: %08x %10u  x4=%08x acc=%08x\n", ofs, u, u, u << 2, acc);
-			acc += u;
-		}
-#endif
 		/* b = size, c = padded size ? d = header length */
 		if(d >= 256) {
 			header_len = 12;
@@ -101,15 +92,20 @@ void clj2840_decode(const void * data, size_t len)
 		snprintf(fname, sizeof(fname), "out%02d_header.bin", i);
 		savefile(data + ofs, header_len, fname);
 		ofs += header_len;
-		snprintf(fname, sizeof(fname), "out%02d_chunk.bin", i);
+		ext = "bin";
+		if(memcmp(data + ofs, elfmagic, 4) == 0) ext = "elf";
+		else if(memcmp(data + ofs, lzmamagic, 3) == 0) ext = "lzma";
+		snprintf(fname, sizeof(fname), "out%02d_chunk.%s", i, ext);
 		savefile(data + ofs, chunk_len, fname);
 		ofs += chunk_len;
 		i++;
 	}
+	printf("%ld / %ld\n", ofs, len);
+	if(ofs < len) {
+		snprintf(fname, sizeof(fname), "out%02d_final.bin", i);
+		savefile(data + ofs, (len - ofs), fname);
+	}
 
-	/*savefile(data, 12, "begin0.bin");
-	savefile(data + 12, 0x10000, "chunk1.bin");
-	savefile(data + 0x1000c, end - 0x1000c, "end.bin");*/
 	ofs1 = -4;
 	i = 1;
 	for(;;) {
