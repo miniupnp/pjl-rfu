@@ -9,8 +9,13 @@
 #include <fcntl.h>
 #include <ctype.h>
 
+#ifndef MIN
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#endif /* MIN */
+
 struct pjl_data {
 	size_t upgrade_size;
+	char name[256];
 };
 
 void parse_pjl_cmd(struct pjl_data * prop, const char * line, size_t len)
@@ -57,6 +62,10 @@ void parse_pjl_cmd(struct pjl_data * prop, const char * line, size_t len)
 	if(cmd_len == 7 && 0 == memcmp(cmd, "UPGRADE", 7)) {
 		if(name_len == 4 && 0 == memcmp(name, "SIZE", 4))
 			prop->upgrade_size = strtoul(value, NULL, 10);
+	} else if(cmd_len == 7 && 0 == memcmp(cmd, "COMMENT", 7)) {
+		if(name_len == 5 && 0 == memcmp(name, "MODEL", 5))
+			memcpy(prop->name, value, MIN(sizeof(prop->name), value_len));
+			prop->name[sizeof(prop->name) - 1] = '\0';
 	}
 }
 
@@ -64,6 +73,7 @@ void pjl_decode(const char * data, size_t len)
 {
 	const char * p;
 	struct pjl_data prop;
+	int i;
 
 	p = data;
 	memset(&prop, 0, sizeof(prop));
@@ -129,15 +139,26 @@ void pjl_decode(const char * data, size_t len)
 	printf("\n");
 */
 	printf("%lu bytes left\n", len - (p - data));
-	printf("upgrade_size=%lu 0x%x\n", prop.upgrade_size, prop.upgrade_size);
+	printf("upgrade_size=%lu 0x%lx\n", prop.upgrade_size, prop.upgrade_size);
+	printf("name='%s'\n", prop.name);
 	if(prop.upgrade_size > len - (p - data)) {
 		fprintf(stderr, "not enough bytes left\n");
 		return;
 	} else {
+		char fname[256];
 		/*size_t towrite = prop.upgrade_size;*/
 		size_t towrite = len - (p - data);
 		ssize_t n;
-		int fd = creat("output2.bin", 0666);
+		int fd;
+		if(prop.name[0] == '\0') {
+			strncpy(fname, "firmware.bin", sizeof(fname));
+		} else {
+			snprintf(fname, sizeof(fname), "%s_firmware.bin", prop.name);
+			for(i = 0; i < (int)sizeof(fname) && fname[i] != '\0'; i++)
+				if(fname[i] == ' ') fname[i] = '_';
+		}
+		printf("writting to %s\n", fname);
+		fd = creat(fname, 0666);
 		if(fd < 0) {
 			perror("creat");
 			return;
