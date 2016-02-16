@@ -73,6 +73,7 @@ void pjl_decode(const char * data, size_t len)
 {
 	const char * p;
 	struct pjl_data prop;
+	int fake_exit;
 	int i;
 
 	p = data;
@@ -103,16 +104,19 @@ void pjl_decode(const char * data, size_t len)
 		fprintf(stderr, "unknown ESC command at offset %lx\n", (p - data));
 		return;
 	}
+	fake_exit = 0;
 	while(p < data + len) {
 		const char * line = p;
 		size_t l;
 		if(memcmp(p, "\033%-12345X", 9) == 0) {
 			/* end of PJL */
 			p += 9;
-			break;
+			if(memcmp(p, "@PJL", 4) != 0) break;
+			else fake_exit = 1;	/* PJL commands continue after the UEL ! */
 		}
 		if(memcmp(p, "@PJL", 4) != 0) {
-			fprintf(stderr, "unknown PJL command at offset %lx\n", (p - data));
+			if(fake_exit) break;
+			fprintf(stderr, "unknown PJL command at offset %06lx\n", (p - data));
 			return;
 		}
 		p += 4;
@@ -174,11 +178,19 @@ void pjl_decode(const char * data, size_t len)
 		close(fd);
 		p += prop.upgrade_size;
 	}
+	i = 0;
 	while(p < data + len) {
 		printf("%02x ", *p & 0xff);
 		p++;
+		i++;
+		if(i >= 16 || (p == data + len)) {
+			printf("| ");
+			for(i = -i; i < 0; i++) {
+				putchar((p[i] < 32) ? ' ' : p[i]);
+			}
+			printf("\n");
+		}
 	}
-	printf("\n");
 }
 
 int main(int argc, char * * argv)
@@ -206,7 +218,7 @@ int main(int argc, char * * argv)
 
 	printf("%s: %lu bytes\n", argv[1], st.st_size);
 
-	data = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE/*MAP_SHARED|MAP_FILE*/, fd, 0);
+	data = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED|MAP_FILE, fd, 0);
 	if(data==NULL) {
 		perror("mmap");
 		close(fd);
