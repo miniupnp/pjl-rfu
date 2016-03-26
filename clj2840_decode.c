@@ -74,7 +74,7 @@ void clj2840_decode(const void * data, size_t len)
 	i = 0;
 	while(ofs < len - 32) {
 		uint32_t a, b, c, d;
-		uint32_t header_len, chunk_len;
+		uint32_t header_len, chunk_len, file_len;
 		const char * ext;
 		a = READU32((p + ofs));
 		b = READU32((p + ofs + 4));
@@ -83,13 +83,21 @@ void clj2840_decode(const void * data, size_t len)
 		printf("%06lx:   %08x   %08x   %08x   %08x", ofs, a, b, c, d);
 		printf("\t%06lx left\n", len - ofs);
 		printf("        %10u %10u %10u %10u\n", a, b, c, d);
-		/* b = size, c = padded size ? d = header length */
+		/* a = type ?, b = padded size, c = size, d = header length */
 		if(d >= 256) {
 			header_len = 12;
 			chunk_len = 0x10000;
+			file_len = chunk_len;
 		} else {
+			uint32_t load_addr, unk20, crc;
 			header_len = d;
 			chunk_len = b;
+			file_len = c;
+			load_addr = READU32((p + ofs + 16));
+			unk20 = READU32((p + ofs + 20)); /* ??? */
+			crc = READU32((p + ofs + 24)); /* ??? */
+			printf("        load_addr=0x%08x (%08x ?) crc=0x%08x\n",
+			       load_addr, unk20, crc);
 		}
 		snprintf(fname, sizeof(fname), "out%02d_header.bin", i);
 		savefile(data + ofs, header_len, fname);
@@ -98,7 +106,7 @@ void clj2840_decode(const void * data, size_t len)
 		if(memcmp(data + ofs, elfmagic, 4) == 0) ext = "elf";
 		else if(memcmp(data + ofs, lzmamagic, 3) == 0) ext = "lzma";
 		snprintf(fname, sizeof(fname), "out%02d_chunk.%s", i, ext);
-		savefile(data + ofs, chunk_len, fname);
+		savefile(data + ofs, file_len, fname);
 		ofs += chunk_len;
 		i++;
 	}
