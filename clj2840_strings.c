@@ -4,8 +4,8 @@
 #include <stdint.h>
 
 /* BIG endian */
-#define READU16(p) (p[0] << 8)|p[1]
-#define READU32(p) (p[0] << 24)|(p[1] << 16)|(p[2] << 8)|p[3]
+#define READU16(p) ((p[0] << 8)|p[1])
+#define READU32(p) ((p[0] << 24)|(p[1] << 16)|(p[2] << 8)|p[3])
 
 
 size_t find_word(const uint8_t * p, const uint8_t * word, size_t off, size_t len)
