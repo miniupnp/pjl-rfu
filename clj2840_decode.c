@@ -64,10 +64,12 @@ void clj2840_decode(const void * data, size_t len)
 	ssize_t ofs1, ofs2;
 	p = (const unsigned char*)data;
 
+#if 0
 	if((elf_ofs = search(data, len, elfmagic, 4, 4, 0)) >= 0) {
 		printf("ELF found at %08lx\n", elf_ofs);
 		savefile(data + elf_ofs, len - elf_ofs, "output.elf");
 	}
+#endif
 
 	i = 0;
 	while(ofs < len - 32) {
