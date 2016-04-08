@@ -3,3 +3,6 @@ pjl_decode
 clj2840_decode
 *.bin
 clj2840_strings
+strings.*
+out*_chunk*
+output*
